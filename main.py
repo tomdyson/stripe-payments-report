@@ -15,6 +15,10 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Configure Stripe logger to be less verbose
+stripe_logger = logging.getLogger('stripe')
+stripe_logger.setLevel(logging.WARNING)
+
 load_dotenv()
 
 app = FastAPI()

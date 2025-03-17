@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe Payments Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <div id="app" class="container mx-auto px-4 py-8 max-w-6xl">
+        <h1 class="text-3xl font-bold text-gray-900 mb-8">Sibford Session payments</h1>
+        
+        <!-- Payment links dropdown with loading state -->
+        <div class="relative mb-8">
+            <select 
+                v-model="selectedLink" 
+                @change="fetchPayments"
+                class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                :disabled="isLoadingLinks"
+            >
+                <option value="">{{ isLoadingLinks ? 'Loading payment links...' : 'Select a payment link' }}</option>
+                <option v-for="link in paymentLinks" :value="link.id">
+                    {{ link.product_name }}
+                </option>
+            </select>
+            <div v-if="isLoadingLinks" class="absolute right-2 top-2">
+                <svg class="animate-spin h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Loading state for payments -->
+        <div v-if="isLoadingPayments" class="flex justify-center items-center p-8">
+            <svg class="animate-spin h-8 w-8 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="ml-2 text-gray-600">Loading payments...</span>
+        </div>
+
+        <!-- Payments table -->
+        <div class="overflow-x-auto bg-white rounded-lg shadow" v-if="payments.length && !isLoadingPayments">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Email</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <tr v-for="payment in payments" class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ new Date(payment.created * 1000).toLocaleString() }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ (payment.amount / 100).toFixed(2) }} {{ payment.currency.toUpperCase() }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ payment.customer?.name || 'N/A' }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ payment.customer?.email || 'N/A' }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full" 
+                                  :class="{
+                                    'bg-green-100 text-green-800': payment.status === 'succeeded',
+                                    'bg-yellow-100 text-yellow-800': payment.status === 'processing',
+                                    'bg-red-100 text-red-800': payment.status === 'failed'
+                                  }">
+                                {{ payment.status }}
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+                <tfoot class="bg-gray-50">
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Total</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ totalAmount }}</td>
+                        <td colspan="3"></td>
+                    </tr>
+                </tfoot>
+            </table>
+            
+            <div class="p-4 border-t border-gray-200">
+                <button 
+                    @click="copyToClipboard"
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                    {{ copyButtonText }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    paymentLinks: [],
+                    selectedLink: '',
+                    payments: [],
+                    isLoadingLinks: false,
+                    isLoadingPayments: false,
+                    copyButtonText: 'Copy Summary'
+                }
+            },
+            mounted() {
+                this.fetchPaymentLinks()
+            },
+            computed: {
+                totalAmount() {
+                    if (!this.payments.length) return '';
+                    
+                    // Get all amounts
+                    const amounts = this.payments.map(p => p.amount);
+                    const total = amounts.reduce((sum, amount) => sum + amount, 0);
+                    const currency = this.payments[0].currency.toUpperCase();
+                    
+                    // Find likely ticket price (GCD of all amounts)
+                    const gcd = (a, b) => !b ? a : gcd(b, a % b);
+                    const ticketPrice = amounts.reduce(gcd);
+                    const ticketCount = total / ticketPrice;
+                    
+                    return `${(total / 100).toFixed(2)} ${currency} (${ticketCount} tickets)`;
+                }
+            },
+            methods: {
+                async fetchPaymentLinks() {
+                    this.isLoadingLinks = true
+                    try {
+                        const response = await fetch('http://localhost:8000/api/payment-links')
+                        this.paymentLinks = await response.json()
+                    } catch (error) {
+                        console.error('Error fetching payment links:', error)
+                    } finally {
+                        this.isLoadingLinks = false
+                    }
+                },
+                async fetchPayments() {
+                    if (!this.selectedLink) return
+                    this.isLoadingPayments = true
+                    this.payments = [] // Clear existing payments
+                    try {
+                        const response = await fetch(`http://localhost:8000/api/payments/${this.selectedLink}`)
+                        this.payments = await response.json()
+                    } catch (error) {
+                        console.error('Error fetching payments:', error)
+                    } finally {
+                        this.isLoadingPayments = false
+                    }
+                },
+                getTicketCount(amount) {
+                    const amounts = this.payments.map(p => p.amount);
+                    const gcd = (a, b) => !b ? a : gcd(b, a % b);
+                    const ticketPrice = amounts.reduce(gcd);
+                    return amount / ticketPrice;
+                },
+                
+                async copyToClipboard() {
+                    const summary = this.payments
+                        .map(payment => `${(payment.customer?.name || 'Anonymous').replace(/[\r\n]+/g, ' ')} - ${this.getTicketCount(payment.amount)} tickets`)
+                        .join('\n');
+                    
+                    const total = this.payments.reduce((sum, payment) => sum + this.getTicketCount(payment.amount), 0);
+                    const fullSummary = `${summary}\nTotal - ${total} tickets`;
+                    
+                    try {
+                        await navigator.clipboard.writeText(fullSummary);
+                        this.copyButtonText = 'Summary Copied';
+                        setTimeout(() => {
+                            this.copyButtonText = 'Copy Summary';
+                        }, 2000);
+                    } catch (err) {
+                        console.error('Failed to copy text: ', err);
+                    }
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>

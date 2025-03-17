@@ -56,8 +56,8 @@ async def login(response: Response, password: str = Form()):
             key=COOKIE_NAME,
             value=token,
             httponly=True,
-            secure=True,
-            samesite="strict",
+            secure=False,  # Changed from True to allow HTTP
+            samesite="lax",  # Changed from strict to lax
             max_age=86400  # 24 hours
         )
         return RedirectResponse(url="/static/index.html", status_code=303)

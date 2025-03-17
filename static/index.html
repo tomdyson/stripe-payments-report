@@ -102,7 +102,8 @@
                     payments: [],
                     isLoadingLinks: false,
                     isLoadingPayments: false,
-                    copyButtonText: 'Copy Summary'
+                    copyButtonText: 'Copy Summary',
+                    apiBase: window.location.origin
                 }
             },
             mounted() {
@@ -129,7 +130,7 @@
                 async fetchPaymentLinks() {
                     this.isLoadingLinks = true
                     try {
-                        const response = await fetch('http://localhost:8000/api/payment-links')
+                        const response = await fetch(`${this.apiBase}/api/payment-links`)
                         this.paymentLinks = await response.json()
                     } catch (error) {
                         console.error('Error fetching payment links:', error)
@@ -142,7 +143,7 @@
                     this.isLoadingPayments = true
                     this.payments = [] // Clear existing payments
                     try {
-                        const response = await fetch(`http://localhost:8000/api/payments/${this.selectedLink}`)
+                        const response = await fetch(`${this.apiBase}/api/payments/${this.selectedLink}`)
                         this.payments = await response.json()
                     } catch (error) {
                         console.error('Error fetching payments:', error)
